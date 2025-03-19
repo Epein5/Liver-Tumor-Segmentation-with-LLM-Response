@@ -1,0 +1,15 @@
+
+fastapi
+keras==3.5.0
+matplotlib==3.10.1
+numpy==1.26.4
+opencv-python==4.10.0.82
+pandas==2.2.3
+pillow
+pydantic
+pydantic_core
+python-multipart
+tensorflow==2.17.1
+torch
+uvicorn
+scipy

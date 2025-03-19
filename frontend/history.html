@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - Liver Cancer AI</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Additional styles for the history page */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+
+        .history-item-thumbnail {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .history-item-info {
+            flex: 1;
+        }
+
+        .delete-button {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .delete-button:hover {
+            background-color: #cc0000;
+        }
+
+        .clear-button {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .clear-button:hover {
+            background-color: #cc0000;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .history-detail {
+            margin-top: 20px;
+        }
+
+        .back-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+
+        .back-button:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>Liver Cancer AI</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/segmentation">Tumor Segmentation</a></li>
+                <li><a href="/research">Treatment & Research</a></li>
+                <li><a href="/history" class="active">History</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="history-section">
+            <h2>Your Analysis History</h2>
+            <p>View your previous liver CT scan analyses. All data is stored locally in your browser.</p>
+            
+            <!-- History list (shown when history exists) -->
+            <div id="history-list" class="history-list">
+                {% if history %}
+                    {% for item in history %}
+                    <div class="history-item">
+                        <img src="{{ item.original_image }}" alt="Original Image" class="history-item-thumbnail">
+                        <div class="history-item-info">
+                            <h4>Analysis #{{ loop.index }}</h4>
+                            <p><strong>Date:</strong> {{ item.timestamp.split(' ')[0] }}</p>
+                            <p><strong>Time:</strong> {{ item.timestamp.split(' ')[1] }}</p>
+                            <p><strong>Tumor Metrics:</strong></p>
+                            <ul>
+                                <li><strong>Area (pixels):</strong> {{ item.tumor_metrics.area_pixels }}</li>
+                                <li><strong>Percentage:</strong> {{ item.tumor_metrics.percentage }}%</li>
+                                <li><strong>Max Diameter (pixels):</strong> {{ item.tumor_metrics.max_diameter_pixels }}</li>
+                                <li><strong>Width (pixels):</strong> {{ item.tumor_metrics.width_pixels }}</li>
+                                <li><strong>Height (pixels):</strong> {{ item.tumor_metrics.height_pixels }}</li>
+                            </ul>
+                            <p><strong>Explanation:</strong> {{ item.medical_explanation }}</p>
+                            <button class="view-detail-button" data-id="{{ item.id }}" 
+                                    data-original="{{ item.original_image }}" 
+                                    data-segmented="{{ item.segmented_image }}" 
+                                    data-gradcam="{{ item.gradcam_image }}" 
+                                    style="background-color: #4CAF50; color: white; border: none; padding: 5px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; transition: background-color 0.3s ease;">
+                                View Results
+                            </button>
+                            <form action="/delete-history" method="post" style="display:inline;">
+                                <input type="hidden" name="result_id" value="{{ item.id }}">
+                                <button type="submit" class="delete-button">   Delete   </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div id="history-empty" class="empty-state">
+                        <p>You haven't analyzed any images yet. Visit the <a href="/segmentation">Tumor Segmentation</a> page to get started.</p>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- History detail (hidden by default) -->
+            <div id="history-detail" class="history-detail" style="display: none;">
+                <button id="back-to-list" class="back-button">← Back to List</button>
+                
+                <h3>Analysis Results</h3>
+                <p id="history-timestamp" class="timestamp"></p>
+                
+                <div class="result-images">
+                    <div class="result-image">
+                        <h4>Original Image</h4>
+                        <img id="history-original-image" src="" alt="Original CT scan">
+                    </div>
+                    <div class="result-image">
+                        <h4>Segmented Image</h4>
+                        <img id="history-segmented-image" src="" alt="Segmented tumor">
+                    </div>
+                    <div class="result-image">
+                        <h4>Grad-CAM Image</h4>
+                        <img id="history-gradcam-image" src="" alt="Grad-CAM visualization">
+                    </div>
+                </div>
+                
+                <!-- <div class="explanation-box">
+                    <h4>AI-Generated Explanation</h4>
+                    <p id="history-explanation-text"></p>
+                    <div class="metrics">
+                        <div class="metric">
+                            <span class="metric-label">Tumor Size:</span>
+                            <span id="history-tumor-size" class="metric-value"></span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Confidence:</span>
+                            <span id="history-confidence" class="metric-value"></span>
+                        </div>
+                    </div> -->
+                </div>
+            </div>
+        </section>
+        
+        <!-- Clear data section -->
+        <section class="clear-data">
+            <h3>Clear Data</h3>
+            <p>If you wish to remove all your history data from this browser, click the button below.</p>
+            <button id="clear-history" class="clear-button">Clear All History</button>
+            <p class="disclaimer-text">Note: This action cannot be undone.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Liver Cancer AI. This site is for educational purposes only and not intended to provide medical advice.</p>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/history.js"></script>
+    <script>
+        // Show empty state if no history exists
+        const historyList = document.getElementById('history-list');
+        const historyEmpty = document.getElementById('history-empty');
+        if (historyList.children.length === 0) {
+            historyEmpty.style.display = 'block';
+        } else {
+            historyEmpty.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+/venv
+/db
+test.png
+test2.png
+test.ipynb
+/models
+LiverSegmentation.mp4
+test.py
+/backend/__pycache__

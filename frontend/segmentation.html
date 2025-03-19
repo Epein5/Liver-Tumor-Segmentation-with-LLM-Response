@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tumor Segmentation - Liver Cancer AI</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <style>
+        /* Additional styles for better visualization */
+        .result-images {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .result-image {
+            flex: 1;
+            min-width: 250px;
+            max-width: 450px;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .result-image img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        .explanation-box {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .metrics {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .metric {
+            flex: 1;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.05);
+        }
+        .metric-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .metric-value {
+            font-size: 1.2em;
+            color: #2c3e50;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #09f;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-indicator {
+            text-align: center;
+            padding: 30px;
+            display: none;
+        }
+        .upload-preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .upload-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            display: none;
+            margin: 0 auto;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .upload-label {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        #file-name {
+            color: #555;
+        }
+        .cta-button {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .cta-button:hover {
+            background-color: #0b7dda;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>Liver Cancer AI</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/segmentation" class="active">Tumor Segmentation</a></li>
+                <li><a href="/research">Treatment & Research</a></li>
+                <li><a href="/history">History</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="segmentation-tool">
+            <h2>Liver Tumor Segmentation</h2>
+            <p>Upload a liver CT scan image to analyze and segment potential tumor regions. This AI tool helps identify and visualize potential tumors within liver tissue.</p>
+            
+            <div class="upload-container">
+                <form id="upload-form">
+                    <div class="file-input-container">
+                        <input type="file" id="image-upload" accept="image/*" hidden>
+                        <label for="image-upload" class="upload-label">Choose File</label>
+                        <span id="file-name">No file chosen</span>
+                    </div>
+                    <button type="submit" class="cta-button" id="upload-button">Analyze Image</button>
+                </form>
+                <div class="upload-preview">
+                    <img id="preview-image" src="" alt="Preview will appear here">
+                </div>
+            </div>
+
+            <div class="loading-indicator" id="loading">
+                <div class="spinner"></div>
+                <p>Processing image and generating segmentation...</p>
+            </div>
+
+            <div class="results-container" id="results" style="display: none;">
+                <h3>Analysis Results</h3>
+                
+                <div class="result-images">
+                    <div class="result-image">
+                        <h4>Original Image</h4>
+                        <img id="original-image" src="" alt="Original CT scan">
+                    </div>
+                    <div class="result-image">
+                        <h4>Segmented Image</h4>
+                        <!-- <p><small>Green: Liver tissue | Red: Potential tumor</small></p> -->
+                        <img id="segmented-image" src="" alt="Segmented tumor">
+                        <p><small>Green: Liver tissue | Blue: Potential tumor</small></p>
+                    </div>
+                </div>
+                <div class="result-images">
+                    <div class="result-image">
+                        <h4>Grad-CAM Tumor Focus</h4>
+                        <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
+                        <p><small>Heatmap highlighting tumor regions</small></p>
+                    </div>
+                </div>
+                
+                <div class="explanation-box">
+                    <h4>AI-Generated Analysis</h4>
+                    <p id="explanation-text"></p>
+                    <div class="metrics">
+                        <div class="metric">
+                            <span class="metric-label">Tumor Size:</span>
+                            <span id="tumor-size" class="metric-value"></span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Confidence:</span>
+                            <span id="confidence" class="metric-value"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="disclaimer">
+            <h3>Important Notice</h3>
+            <p>This tool is intended for educational and research purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Liver Cancer AI. This site is for educational purposes only and not intended to provide medical advice.</p>
+    </footer>
+
+    <script>
+        // JavaScript for handling file upload and displaying results
+        document.getElementById('upload-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('image-upload');
+            const loadingIndicator = document.getElementById('loading');
+            const resultsContainer = document.getElementById('results');
+            const previewImage = document.getElementById('preview-image');
+            const gradcamImage = document.getElementById('gradcam-image');
+
+            const originalImage = document.getElementById('original-image');
+            const segmentedImage = document.getElementById('segmented-image');
+            const explanationText = document.getElementById('explanation-text');
+            const tumorSize = document.getElementById('tumor-size');
+            const confidence = document.getElementById('confidence');
+    
+            if (fileInput.files.length === 0) {
+                alert('Please select an image file.');
+                return;
+            }
+    
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
+            resultsContainer.style.display = 'none';
+    
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+    
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+    
+                if (!response.ok) {
+                    throw new Error('Analysis failed');
+                }
+    
+                const data = await response.json();
+    
+                // Display results
+                originalImage.src = data.original_image_url;
+                segmentedImage.src = data.segmented_image_url;
+                gradcamImage.src = data.gradcam_image_url;
+                gradcamImage.style.display = 'block';
+
+                // Format explanation text with line breaks
+                const formattedExplanation = data.medical_explanation
+                    .replace(/\. /g, '.<br>') // Add line breaks after each sentence
+                    .replace(/, /g, ',<br>'); // Add line breaks after commas for better readability
+                explanationText.innerHTML = formattedExplanation;
+    
+                tumorSize.textContent = `${data.tumor_metrics.percentage.toFixed(2)}%`;
+                confidence.textContent = "High"; // Modify this based on your logic
+    
+                resultsContainer.style.display = 'block';
+            } catch (error) {
+                alert('Error analyzing image: ' + error.message);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        });
+    
+        // Preview uploaded image
+        document.getElementById('image-upload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const previewImage = document.getElementById('preview-image');
+            const fileName = document.getElementById('file-name');
+    
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImage.src = e.target.result;
+                    previewImage.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+                fileName.textContent = file.name;
+            } else {
+                previewImage.style.display = 'none';
+                fileName.textContent = 'No file chosen';
+            }
+        });
+    </script>
+    
+</body>
+</html>
+

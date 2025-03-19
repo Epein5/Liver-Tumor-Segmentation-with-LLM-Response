@@ -1,1 +1,0 @@
-# Liver-Tumor-Segmentation-with-LLM-Response
