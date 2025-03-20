@@ -6,3 +6,5 @@ test.ipynb
 LiverSegmentation.mp4
 test.py
 /backend/__pycache__
+models/*.h5
+models/efficientnet_unet_model.h5

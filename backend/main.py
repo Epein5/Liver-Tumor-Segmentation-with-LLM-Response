@@ -3,7 +3,8 @@ import os
 import shutil
 
 # Add the backend directory to sys.path
-sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
+# Comment if you want to build a docker image
+# sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
@@ -24,11 +25,21 @@ from ml_model import analyze_and_save_medical_image
 from fastapi.middleware.cors import CORSMiddleware
 
 # Load the TensorFlow model
-model = tf.keras.models.load_model("models/efficientnet_unet_model.h5")
 
 app = FastAPI(title="Liver Cancer Segmentation API")
 
-session_storage = {}
+model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_model.h5")
+try:
+    model = tf.keras.models.load_model(model_path)
+    print(f"Model loaded successfully from {model_path}")
+except Exception as e:
+    print(f"Error loading model: {str(e)}")
+    # Attempt to find the model by checking directory contents
+    for root, dirs, files in os.walk("."):
+        for file in files:
+            if file.endswith(".h5"):
+                print(f"Found model file at: {os.path.join(root, file)}")
+
 
 # Serve static files (CSS, JS)
 app.mount("/static", StaticFiles(directory="./frontend"), name="static")
@@ -36,8 +47,7 @@ app.mount("/static", StaticFiles(directory="./frontend"), name="static")
 # Templates for HTML rendering
 templates = Jinja2Templates(directory="./frontend")
 
-# In-memory session storage (replace with a database for production)
-session_storage = {}
+os.makedirs("db", exist_ok=True)
 
 # Add CORS middleware
 app.add_middleware(
@@ -229,5 +239,4 @@ async def clear_history():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

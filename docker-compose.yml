@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  liver-tumor-app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - liver_tumor_data:/app/db
+    restart: unless-stopped
+
+volumes:
+  liver_tumor_data:

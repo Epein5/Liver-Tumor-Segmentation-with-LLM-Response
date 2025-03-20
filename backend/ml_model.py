@@ -12,15 +12,15 @@ from scipy.ndimage import gaussian_filter
 import json
 import requests
 
-def create_analysis_system(model_path="efficientnet_unet_model.h5"):
-    """Initialize the medical image analysis system with the specified model."""
-    # Load the model
-    model = load_model(model_path)
+# def create_analysis_system(model_path="efficientnet_unet_model.h5"):
+#     """Initialize the medical image analysis system with the specified model."""
+#     # Load the model
+#     model = load_model(model_path)
     
-    # Create base database directory if it doesn't exist
-    os.makedirs("db", exist_ok=True)
+#     # Create base database directory if it doesn't exist
+#     os.makedirs("db", exist_ok=True)
     
-    return model
+#     return model
 
 def load_and_preprocess_image(image_path, target_size=(128, 128)):
     """Load and preprocess the input image."""
