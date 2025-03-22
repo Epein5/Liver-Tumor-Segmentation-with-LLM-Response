@@ -6,8 +6,11 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - liver_tumor_data:/app/db
+      - db_data:/app/db
     restart: unless-stopped
+    environment:
+      - PORT=8000
+      - WEBSITES_PORT=8000
 
 volumes:
-  liver_tumor_data:
+  db_data:

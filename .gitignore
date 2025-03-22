@@ -8,3 +8,5 @@ test.py
 /backend/__pycache__
 models/*.h5
 models/efficientnet_unet_model.h5
+/test_images
+/temp

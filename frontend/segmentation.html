@@ -11,7 +11,7 @@
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
-            justify-content: center;
+            justify-content: center; /* Ensure images are centered */
             margin-bottom: 20px;
         }
         .result-image {
@@ -171,11 +171,29 @@
                 </div>
                 <div class="result-images">
                     <div class="result-image">
-                        <h4>Grad-CAM Tumor Focus</h4>
+                        <h4>SHAP (Liver and Tumor)</h4>
+                        <img id="combined-shap-overlay" src="" alt="Combined SHAP Overlay">
+                        <p><small>SHAP overlay combining liver and tumor regions</small></p>
+                    </div>
+                    <div class="result-image">
+                        <h4>GRAD-CAM Tumor Focus</h4>
+                        <!-- <p><small>Green: Liver tissue | Red: Potential tumor</small></p> -->
                         <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
                         <p><small>Heatmap highlighting tumor regions</small></p>
                     </div>
                 </div>
+                <!-- <div class="result-images">
+                    <div class="result-image">
+                        <h4>Grad-CAM Tumor Focus</h4>
+                        <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
+                        <p><small>Heatmap highlighting tumor regions</small></p>
+                    </div>
+                    <div class="result-image">
+                        <h4>Combined SHAP Overlay</h4>
+                        <img id="combined-shap-overlay" src="" alt="Combined SHAP Overlay">
+                        <p><small>SHAP overlay combining liver and tumor regions</small></p>
+                    </div>
+                </div> -->
                 
                 <div class="explanation-box">
                     <h4>AI-Generated Analysis</h4>
@@ -214,6 +232,7 @@
             const resultsContainer = document.getElementById('results');
             const previewImage = document.getElementById('preview-image');
             const gradcamImage = document.getElementById('gradcam-image');
+            const combinedShapOverlay = document.getElementById('combined-shap-overlay');
 
             const originalImage = document.getElementById('original-image');
             const segmentedImage = document.getElementById('segmented-image');
@@ -250,6 +269,8 @@
                 segmentedImage.src = data.segmented_image_url;
                 gradcamImage.src = data.gradcam_image_url;
                 gradcamImage.style.display = 'block';
+                combinedShapOverlay.src = data.combined_shap_overlay_url;
+                combinedShapOverlay.style.display = 'block'; // Ensure SHAP image is displayed
 
                 // Format explanation text with line breaks
                 const formattedExplanation = data.medical_explanation
@@ -258,7 +279,15 @@
                 explanationText.innerHTML = formattedExplanation;
     
                 tumorSize.textContent = `${data.tumor_metrics.percentage.toFixed(2)}%`;
-                confidence.textContent = "High"; // Modify this based on your logic
+
+                // Set confidence level based on tumor size
+                if (data.tumor_metrics.percentage < 10) {
+                    confidence.textContent = "Low";
+                } else if (data.tumor_metrics.percentage >= 10 && data.tumor_metrics.percentage < 20) {
+                    confidence.textContent = "Mid";
+                } else {
+                    confidence.textContent = "High";
+                }
     
                 resultsContainer.style.display = 'block';
             } catch (error) {

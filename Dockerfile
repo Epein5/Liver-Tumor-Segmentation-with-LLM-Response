@@ -20,6 +20,9 @@ COPY backend/ /app/
 COPY frontend/ /app/frontend/
 COPY models/ /app/models/
 
+ENV PORT=8000
+ENV WEBSITES_PORT=8000
+
 # Expose port
 EXPOSE 8000
 

@@ -28,7 +28,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Liver Cancer Segmentation API")
 
-model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_model.h5")
+# model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_model.h5")
+model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_55ephocsss.h5")
+# model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unetshap.h5")
+
 try:
     model = tf.keras.models.load_model(model_path)
     print(f"Model loaded successfully from {model_path}")
@@ -88,6 +91,7 @@ async def history_page(request: Request):
                     "original_image": f"/results/{analysis_id}/original.png",
                     "segmented_image": f"/results/{analysis_id}/combined_segmentation.png",
                     "gradcam_image": f"/results/{analysis_id}/gradcam_tumor_focused.png",
+                    "combined_shap_overlay": f"/results/{analysis_id}/combined_shap_overlay.png",
                     "tumor_metrics": tumor_metrics,
                     "medical_explanation": medical_explanation,
                 })
@@ -117,7 +121,7 @@ def generate_explanation(tumor_size, confidence):
         severity = "significant"
         recommendation = "immediate consultation with a specialist is advised"
     
-    confidence_level = "low" if confidence < 0.6 else "moderate" if confidence < 0.8 else "high"
+    confidence_level = "low" if confidence < 0.5 else "moderate" if confidence < 0.8 else "high"
     
     explanation = (
         f"The analysis indicates a {severity} tumor presence with {confidence_level} confidence. "
@@ -130,7 +134,7 @@ def generate_explanation(tumor_size, confidence):
 
 # API endpoint for image analysis
 @app.post("/analyze")
-async def analyze_image(file: UploadFile = File(...)):
+async def analyze_image(file: UploadFile = File(...), fast_mode: bool = Form(False)):
     try:
         # Save the uploaded file temporarily
         file_path = f"temp/{uuid.uuid4()}.png"
@@ -138,8 +142,10 @@ async def analyze_image(file: UploadFile = File(...)):
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Analyze the image
-        output_dir, tumor_metrics, medical_explanation = analyze_and_save_medical_image(model, file_path)
+        # Analyze the image with optimized performance option
+        output_dir, tumor_metrics, medical_explanation = analyze_and_save_medical_image(
+            model, file_path, fast_mode=fast_mode
+        )
 
         # Prepare response
         response = {
@@ -147,9 +153,15 @@ async def analyze_image(file: UploadFile = File(...)):
             "tumor_metrics": tumor_metrics,
             "medical_explanation": medical_explanation,
             "original_image_url": f"/results/{os.path.basename(output_dir)}/original.png",
-            "segmented_image_url": f"/results/{os.path.basename(output_dir)}/combined_segmentation.png",
-            "gradcam_image_url": f"/results/{os.path.basename(output_dir)}/gradcam_tumor_focused.png",
+            "segmented_image_url": f"/results/{os.path.basename(output_dir)}/combined_segmentation.png"
         }
+        
+        # Only include these fields if not in fast mode
+        if not fast_mode:
+            response.update({
+                "gradcam_image_url": f"/results/{os.path.basename(output_dir)}/gradcam_tumor_focused.png",
+                "combined_shap_overlay_url": f"/results/{os.path.basename(output_dir)}/combined_shap_overlay.png",
+            })
 
         # Clean up temporary file
         os.remove(file_path)
@@ -187,6 +199,7 @@ async def read_history():
                 "timestamp": datetime.fromtimestamp(os.path.getctime(analysis_dir)).strftime("%Y-%m-%d %H:%M:%S"),
                 "original_image": f"/results/{analysis_id}/original.png",
                 "segmented_image": f"/results/{analysis_id}/combined_segmentation.png",
+                "combined_shap_overlay": f"/results/{analysis_id}/combined_shap_overlay.png",
                 "tumor_metrics": tumor_metrics,
                 "medical_explanation": medical_explanation,
             })
@@ -239,4 +252,6 @@ async def clear_history():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)

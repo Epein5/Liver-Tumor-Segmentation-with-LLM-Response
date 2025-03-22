@@ -11,25 +11,22 @@ import uuid
 from scipy.ndimage import gaussian_filter
 import json
 import requests
+import shap
 
-# def create_analysis_system(model_path="efficientnet_unet_model.h5"):
-#     """Initialize the medical image analysis system with the specified model."""
-#     # Load the model
-#     model = load_model(model_path)
-    
-#     # Create base database directory if it doesn't exist
-#     os.makedirs("db", exist_ok=True)
-    
-#     return model
 
-def load_and_preprocess_image(image_path, target_size=(128, 128)):
-    """Load and preprocess the input image."""
+def load_and_preprocess_image(image_path, target_size=(128, 128), downsample_factor=1):
+    """Load and preprocess the input image with optional downsampling for speed."""
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     if image is None:
         raise FileNotFoundError(f"Image at {image_path} not found.")
     
     # Store original image for display
     original = image.copy()
+    
+    # Apply downsampling for faster processing if requested
+    if downsample_factor > 1:
+        h, w = image.shape
+        image = cv2.resize(image, (w//downsample_factor, h//downsample_factor))
     
     # Resize and preprocess for model
     image = cv2.resize(image, target_size)
@@ -54,25 +51,28 @@ def modify_model_output(model):
     modified_output = ReduceMeanLayer(axis=[1, 2])(output_layer)
     return Model(inputs=input_layer, outputs=modified_output)
 
-def get_liver_segmentation_mask(model, image):
-    """Generate and refine the liver segmentation mask."""
+def get_combined_segmentation_masks(model, image):
+    """Generate both liver and tumor segmentation masks with a single model call."""
+    # Single model prediction call
     mask = model.predict(image)
-    mask = (mask - mask.min()) / (mask.max() - mask.min())  # Normalize
-    threshold = np.percentile(mask, 90)  # Use 90th percentile as threshold
-    mask = (mask > threshold).astype(np.uint8)
-    mask = scipy.ndimage.binary_fill_holes(mask.squeeze()).astype(np.uint8)  # Fill holes
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))  # Larger kernel
-    mask = cv2.dilate(mask, np.ones((5, 5), np.uint8), iterations=1)  # Expand the mask
-    return cv2.resize(mask, (128, 128), interpolation=cv2.INTER_NEAREST)
-
-def get_tumor_segmentation_mask(model, image):
-    """Generate and refine the tumor segmentation mask."""
-    mask = model.predict(image)
-    mask = (mask - mask.min()) / (mask.max() - mask.min())  # Normalize
-    mask = (mask > 0.5).astype(np.uint8)  # Thresholding for tumor
-    mask = scipy.ndimage.binary_fill_holes(mask.squeeze()).astype(np.uint8)  # Fill holes
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))  # Remove noise
-    return cv2.resize(mask, (128, 128), interpolation=cv2.INTER_NEAREST)
+    
+    # Process for liver segmentation
+    liver_mask = (mask - mask.min()) / (mask.max() - mask.min())  # Normalize
+    liver_threshold = np.percentile(liver_mask, 90)  # Use 90th percentile as threshold
+    liver_mask = (liver_mask > liver_threshold).astype(np.uint8)
+    liver_mask = scipy.ndimage.binary_fill_holes(liver_mask.squeeze()).astype(np.uint8)  # Fill holes
+    liver_mask = cv2.morphologyEx(liver_mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))  # Larger kernel
+    liver_mask = cv2.dilate(liver_mask, np.ones((5, 5), np.uint8), iterations=1)  # Expand the mask
+    liver_mask = cv2.resize(liver_mask, (128, 128), interpolation=cv2.INTER_NEAREST)
+    
+    # Process for tumor segmentation
+    tumor_mask = (mask - mask.min()) / (mask.max() - mask.min())  # Normalize
+    tumor_mask = (tumor_mask > 0.5).astype(np.uint8)  # Thresholding for tumor
+    tumor_mask = scipy.ndimage.binary_fill_holes(tumor_mask.squeeze()).astype(np.uint8)  # Fill holes
+    tumor_mask = cv2.morphologyEx(tumor_mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))  # Remove noise
+    tumor_mask = cv2.resize(tumor_mask, (128, 128), interpolation=cv2.INTER_NEAREST)
+    
+    return liver_mask, tumor_mask
 
 def create_combined_mask(original_img, liver_mask, tumor_mask):
     """
@@ -269,7 +269,16 @@ def generate_medical_explanation(metrics):
     Generate a medical explanation for the tumor findings.
     In a real system, this would call GEMINI API, but we'll simulate it here.
     """
-    # Calculate severity based on tumor size
+    # Check if tumor is non-significant or not present
+    if metrics["percentage"] < 1:  # Very small threshold
+        return (
+            "LIVER ANALYSIS REPORT: "
+            "No significant tumor detected in the visible liver area. "
+            "The analysis shows normal liver parenchyma without evidence of focal lesions. "
+            "Routine follow-up imaging may be considered based on clinical context and risk factors."
+        )
+    
+    # For cases with significant findings, continue with existing logic
     severity = "minimal"
     if metrics["percentage"] > 2:
         severity = "mild"
@@ -278,21 +287,62 @@ def generate_medical_explanation(metrics):
     if metrics["percentage"] > 10:
         severity = "severe"
     
-    # Create explanation
+    # Handle missing dimensions gracefully
+    max_diameter = metrics.get("max_diameter_pixels", "unknown")
+    width = metrics.get("width_pixels", "unknown")
+    height = metrics.get("height_pixels", "unknown")
+    
+    # Create explanation based on available metrics
     explanation = (
-    f"LIVER TUMOR ANALYSIS REPORT: Findings indicate a tumor detected in the liver segment, "
-    f"occupying approximately {metrics['percentage']:.2f}% of the visible liver area. The maximum tumor diameter is "
-    f"{metrics.get('max_diameter_pixels', 'N/A')} pixels, with dimensions of "
-    f"{metrics.get('width_pixels', 'N/A')} x {metrics.get('height_pixels', 'N/A')} pixels. "
-    f"The scan shows a {severity} hepatic lesion with well-defined borders. The Grad-CAM++ analysis confirms the area "
-    f"of concern and highlights regions of highest diagnostic significance. Recommendations include clinical correlation, "
-    f"follow-up imaging in 3-6 months to assess for changes, and additional laboratory studies as warranted based on clinical presentation."
-)
+        f"LIVER TUMOR ANALYSIS REPORT: "
+        f"Tumor occupying approximately {metrics['percentage']:.2f}% of the visible liver area. "
+    )
+    
+    if max_diameter != "unknown":
+        explanation += f"The maximum tumor diameter is {max_diameter:.2f} pixels. "
+    else:
+        explanation += "The tumor diameter not found. "
+    
+    if width != "unknown" and height != "unknown":
+        explanation += f"The tumor dimensions are approximately {width} x {height} pixels. "
+    else:
+        explanation += "The tumor dimensions could not be found. "
+    
+    explanation += (
+        f"The scan shows a {severity} hepatic lesion with well-defined borders. "
+        f"The Grad-CAM++ analysis confirms the area of concern and highlights regions of highest diagnostic significance. "
+        f"Recommendations include clinical correlation, follow-up imaging in 3-6 months to assess for changes, "
+        f"and additional laboratory studies as warranted based on clinical presentation."
+    )
+    
     return explanation
 
-def analyze_and_save_medical_image(model, image_path):
+
+def compute_shap_values(model, image, background):
+    """Compute SHAP values using GradientExplainer."""
+    explainer = shap.GradientExplainer(model, background, local_smoothing=0.1)
+    return explainer.shap_values(image)
+
+def enhance_shap_visualization(shap_values, mask):
+    """Enhance SHAP values for better visualization."""
+    shap_map = np.abs(shap_values[0].squeeze())
+    shap_map = (shap_map - shap_map.min()) / (shap_map.max() - shap_map.min())
+    shap_map = scipy.ndimage.gaussian_filter(shap_map, sigma=2)  # Smoothing
+    shap_map = (shap_map * 255).astype(np.uint8)
+    return cv2.bitwise_and(shap_map, shap_map, mask=mask)
+
+def create_overlay(image, shap_map, mask, color_map, intensity=1.5):
+    """Create an overlay of SHAP values on the original image."""
+    image_rgb = (image[0] * 255).astype(np.uint8)
+    shap_colored = cv2.applyColorMap(shap_map, color_map)
+    overlay = image_rgb.copy()
+    overlay[mask > 0] = cv2.addWeighted(shap_colored[mask > 0], intensity, image_rgb[mask > 0], 0.5, 0)
+    return overlay
+
+def analyze_and_save_medical_image(model, image_path, fast_mode=False):
     """
     Main function to analyze a medical image, visualize results, and save to database.
+    Added fast_mode to skip expensive operations when speed is preferred.
     """
     try:
         # Create unique ID for this analysis
@@ -300,12 +350,14 @@ def analyze_and_save_medical_image(model, image_path):
         output_dir = os.path.join("db", analysis_id)
         os.makedirs(output_dir, exist_ok=True)
         
-        # Load and preprocess image
-        preprocessed_image, original_image = load_and_preprocess_image(image_path)
+        # Load and preprocess image - use downsample_factor=2 for faster processing in fast mode
+        downsample_factor = 2 if fast_mode else 1
+        preprocessed_image, original_image = load_and_preprocess_image(
+            image_path, downsample_factor=downsample_factor
+        )
         
-        # Generate liver and tumor segmentation masks
-        liver_mask = get_liver_segmentation_mask(model, preprocessed_image)
-        tumor_mask = get_tumor_segmentation_mask(model, preprocessed_image)
+        # Generate liver and tumor segmentation masks with a single model call
+        liver_mask, tumor_mask = get_combined_segmentation_masks(model, preprocessed_image)
         
         # Create combined segmentation masks
         combined_mask_img, labeled_mask = create_combined_mask(
@@ -317,34 +369,12 @@ def analyze_and_save_medical_image(model, image_path):
         # Calculate tumor metrics
         tumor_metrics = calculate_tumor_metrics(tumor_mask)
         
-        # Generate Grad-CAM++ explanations
-        original_grad_cam, tumor_focused_grad_cam = compute_gradcam_plus_with_focus(
-            model, 
-            preprocessed_image, 
-            tumor_mask
-        )
-        
-        # Create visualizations with improved overlay
-        grad_cam_general = overlay_heatmap_improved(
-            original_image, 
-            original_grad_cam, 
-            alpha=0.7
-        )
-        
-        grad_cam_tumor_focused = overlay_heatmap_improved(
-            original_image, 
-            tumor_focused_grad_cam, 
-            alpha=0.7, 
-            use_jet=False
-        )
-        
         # Generate medical explanation
         medical_explanation = generate_medical_explanation(tumor_metrics)
         
-        # Save all outputs
+        # Save basic results
         cv2.imwrite(os.path.join(output_dir, "original.png"), original_image)
         cv2.imwrite(os.path.join(output_dir, "combined_segmentation.png"), combined_mask_img)
-        cv2.imwrite(os.path.join(output_dir, "gradcam_tumor_focused.png"), grad_cam_tumor_focused)
         
         # Save metrics and explanation
         with open(os.path.join(output_dir, "tumor_metrics.json"), "w") as f:
@@ -353,7 +383,43 @@ def analyze_and_save_medical_image(model, image_path):
         with open(os.path.join(output_dir, "medical_report.txt"), "w") as f:
             f.write(medical_explanation)
         
-        # Create visualization for display
+        # Skip computationally expensive operations in fast mode
+        if not fast_mode:
+            # Compute SHAP values (expensive operation)
+            model_with_vector_output = modify_model_output(model)
+            background = np.zeros_like(preprocessed_image)
+            shap_values = compute_shap_values(model_with_vector_output, preprocessed_image, background)
+            
+            shap_map_liver = enhance_shap_visualization(shap_values, liver_mask)
+            shap_map_tumor = enhance_shap_visualization(shap_values, tumor_mask)
+            
+            liver_overlay = create_overlay(preprocessed_image, shap_map_liver, liver_mask, cv2.COLORMAP_SUMMER, intensity=7.0)
+            tumor_overlay = create_overlay(preprocessed_image, shap_map_tumor, tumor_mask, cv2.COLORMAP_JET, intensity=2.0)
+            
+            combined_overlay = cv2.addWeighted(liver_overlay, 0.5, tumor_overlay, 0.5, 0)
+            
+            # Generate Grad-CAM++ explanations (expensive operation)
+            _, tumor_focused_grad_cam = compute_gradcam_plus_with_focus(
+                model, 
+                preprocessed_image, 
+                tumor_mask
+            )
+            
+            grad_cam_tumor_focused = overlay_heatmap_improved(
+                original_image, 
+                tumor_focused_grad_cam, 
+                alpha=0.7, 
+                use_jet=False
+            )
+            
+            # Resize and save additional visualizations
+            h, w = original_image.shape[:2]
+            combined_overlay_resized = cv2.resize(combined_overlay, (w, h), interpolation=cv2.INTER_LINEAR)
+            
+            cv2.imwrite(os.path.join(output_dir, "combined_shap_overlay.png"), combined_overlay_resized)
+            cv2.imwrite(os.path.join(output_dir, "gradcam_tumor_focused.png"), grad_cam_tumor_focused)
+        
+        # Return results
         return output_dir, tumor_metrics, medical_explanation
         
     except Exception as e:
