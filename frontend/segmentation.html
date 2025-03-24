@@ -27,6 +27,8 @@
             max-width: 100%;
             height: auto;
             border-radius: 4px;
+            display: block;
+            margin: 0 auto;
         }
         .explanation-box {
             background-color: #f9f9f9;
@@ -169,31 +171,20 @@
                         <p><small>Green: Liver tissue | Blue: Potential tumor</small></p>
                     </div>
                 </div>
+                
                 <div class="result-images">
                     <div class="result-image">
                         <h4>SHAP (Liver and Tumor)</h4>
                         <img id="combined-shap-overlay" src="" alt="Combined SHAP Overlay">
-                        <p><small>SHAP overlay combining liver and tumor regions</small></p>
+                        <p><small>SHAP overlay</small></p>
                     </div>
                     <div class="result-image">
                         <h4>GRAD-CAM Tumor Focus</h4>
                         <!-- <p><small>Green: Liver tissue | Red: Potential tumor</small></p> -->
                         <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
-                        <p><small>Heatmap highlighting tumor regions</small></p>
+                        <p><small>Heatmap</small></p>
                     </div>
                 </div>
-                <!-- <div class="result-images">
-                    <div class="result-image">
-                        <h4>Grad-CAM Tumor Focus</h4>
-                        <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
-                        <p><small>Heatmap highlighting tumor regions</small></p>
-                    </div>
-                    <div class="result-image">
-                        <h4>Combined SHAP Overlay</h4>
-                        <img id="combined-shap-overlay" src="" alt="Combined SHAP Overlay">
-                        <p><small>SHAP overlay combining liver and tumor regions</small></p>
-                    </div>
-                </div> -->
                 
                 <div class="explanation-box">
                     <h4>AI-Generated Analysis</h4>

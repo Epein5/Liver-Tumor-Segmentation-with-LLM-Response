@@ -44,10 +44,8 @@ git clone https://github.com/yourusername/Liver-Tumor-Segmentation-with-LLM-Resp
 cd Liver-Tumor-Segmentation-with-LLM-Response
 ```
 
-The code is optimized to run on docker hence may not work with the command:
-```bash
-python backend/main.py
-```
+The code is optimized to run on docker and be hosted in Azure:
+
 
 2. Build and run with Docker Compose:
 ```bash
@@ -97,3 +95,65 @@ The Jupyter notebooks in the Notebooks directory contain the research work, incl
 - Training processes
 - Evaluation metrics
 - SHAP value calculations for model explainability
+
+# Liver Tumor Segmentation Application
+
+This application provides liver tumor segmentation using deep learning models.
+
+## Prerequisites
+
+- Python 3.8+
+- TensorFlow 2.x
+- FastAPI
+- Docker (for containerized deployment)
+
+## Running the Application
+
+The application can be run either directly on your host machine or using Docker.
+
+### Running Normally (Without Docker)
+
+1. Install the required dependencies:
+   ```
+   pip install fastapi uvicorn tensorflow pillow scipy
+   ```
+
+2. Modify the `main.py` file to use the local file system:
+   - Uncomment the line: `sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))`
+   - UnComment out the line: `model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")`
+   - Ensure the model path is correctly set for your environment
+
+3. Run the application:
+   ```
+   python backend/main.py
+   ```
+
+4. Access the application at http://localhost:8000
+
+### Running with Docker
+
+1. Modify the `main.py` file for Docker deployment:
+   - Comment out the line: `sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))`
+   - Uncomment the line: `model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")`
+
+2. Build and run the  the Docker image:
+   ```
+   docker-compose up -d --build .
+   ```
+
+
+4. Access the application at http://localhost:8000
+
+## Code Configuration for Deployment
+
+The application requires specific configurations for different deployment methods. In `main.py`, you need to adjust these lines:
+
+```python
+# For normal local execution - uncomment this:
+sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
+
+# For Docker execution - comment out the above and use this model loading approach:
+# model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")
+```
+
+Make sure to adjust these settings based on your chosen deployment method.

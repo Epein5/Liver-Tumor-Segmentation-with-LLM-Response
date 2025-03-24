@@ -117,21 +117,29 @@ def create_combined_mask(original_img, liver_mask, tumor_mask):
     
     return combined, labeled_mask
 
-def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, layer_name="block7a_expand_activation"):
+def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, liver_mask, layer_name="block7a_expand_activation"):
     """
-    Compute Grad-CAM++ heatmap with better focus on the tumor region.
-    This version enhances the focus on tumor regions using the tumor mask.
+    Compute Grad-CAM++ heatmap with focus on the tumor region if present, otherwise focus on liver.
+    This version enhances the focus on tumor regions using the tumor mask, or liver if no tumor detected.
     """
+    # Check if tumor mask has any positive values
+    has_tumor = np.any(tumor_mask > 0)
+    
     # Create gradient model
     grad_model = tf.keras.models.Model(
         inputs=[model.input],
         outputs=[model.get_layer(layer_name).output, model.output]
     )
 
-    # Compute gradients using tumor class
+    # Compute gradients
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img_array)
-        loss = predictions[:, 1]  # Focus on tumor probability
+        if has_tumor:
+            # Use tumor probability when tumor is present
+            loss = predictions[:, 1]  # Focus on tumor probability
+        else:
+            # Use liver probability when no tumor is present
+            loss = predictions[:, 0]  # Focus on liver probability
     
     # Get gradients and compute Grad-CAM++ weights
     grads = tape.gradient(loss, conv_outputs)
@@ -158,22 +166,27 @@ def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, layer_name="bl
     heatmap = gaussian_filter(heatmap, sigma=2)
     
     # Resize heatmap to match mask size
-    heatmap_resized = cv2.resize(heatmap, (tumor_mask.shape[1], tumor_mask.shape[0]))
+    target_mask = tumor_mask if has_tumor else liver_mask
+    heatmap_resized = cv2.resize(heatmap, (target_mask.shape[1], target_mask.shape[0]))
     
-    # Create two versions: one with tumor focus and one original
-    # Original heatmap
+    # Create two versions: one original and one with target focus
     original_heatmap = heatmap_resized.copy()
     
-    # Tumor-focused heatmap: enhance values where tumor is present
-    tumor_focused_heatmap = heatmap_resized.copy()
-    # Boost signal in tumor region
-    boost_factor = 1.5
-    tumor_focused_heatmap = tumor_focused_heatmap * (1 + tumor_mask * boost_factor)
-    # Normalize again after boosting
-    if np.max(tumor_focused_heatmap) != 0:
-        tumor_focused_heatmap = tumor_focused_heatmap / np.max(tumor_focused_heatmap)
+    # Target-focused heatmap: enhance values where target is present
+    focused_heatmap = heatmap_resized.copy()
     
-    return original_heatmap, tumor_focused_heatmap
+    # Boost signal in target region
+    boost_factor = 1.5
+    if has_tumor:
+        focused_heatmap = focused_heatmap * (1 + tumor_mask * boost_factor)
+    else:
+        focused_heatmap = focused_heatmap * (1 + liver_mask * boost_factor)
+    
+    # Normalize again after boosting
+    if np.max(focused_heatmap) != 0:
+        focused_heatmap = focused_heatmap / np.max(focused_heatmap)
+    
+    return original_heatmap, focused_heatmap
 
 def overlay_heatmap_improved(img, heatmap, alpha=0.6, use_jet=True):
     """
@@ -329,20 +342,32 @@ def enhance_shap_visualization(shap_values, mask):
     shap_map = (shap_map - shap_map.min()) / (shap_map.max() - shap_map.min())
     shap_map = scipy.ndimage.gaussian_filter(shap_map, sigma=2)  # Smoothing
     shap_map = (shap_map * 255).astype(np.uint8)
-    return cv2.bitwise_and(shap_map, shap_map, mask=mask)
+    
+    # Check if mask has any positive values
+    if np.any(mask > 0):
+        return cv2.bitwise_and(shap_map, shap_map, mask=mask)
+    else:
+        # If no mask, return just the shap_map
+        return shap_map
 
 def create_overlay(image, shap_map, mask, color_map, intensity=1.5):
     """Create an overlay of SHAP values on the original image."""
     image_rgb = (image[0] * 255).astype(np.uint8)
     shap_colored = cv2.applyColorMap(shap_map, color_map)
     overlay = image_rgb.copy()
-    overlay[mask > 0] = cv2.addWeighted(shap_colored[mask > 0], intensity, image_rgb[mask > 0], 0.5, 0)
+    
+    # Check if mask has any positive values
+    if np.any(mask > 0):
+        overlay[mask > 0] = cv2.addWeighted(shap_colored[mask > 0], intensity, image_rgb[mask > 0], 0.5, 0)
+    else:
+        # If no positive values in mask, just return the original image
+        pass
+        
     return overlay
 
-def analyze_and_save_medical_image(model, image_path, fast_mode=False):
+def analyze_and_save_medical_image(model, image_path):
     """
     Main function to analyze a medical image, visualize results, and save to database.
-    Added fast_mode to skip expensive operations when speed is preferred.
     """
     try:
         # Create unique ID for this analysis
@@ -350,14 +375,16 @@ def analyze_and_save_medical_image(model, image_path, fast_mode=False):
         output_dir = os.path.join("db", analysis_id)
         os.makedirs(output_dir, exist_ok=True)
         
-        # Load and preprocess image - use downsample_factor=2 for faster processing in fast mode
-        downsample_factor = 2 if fast_mode else 1
+        # Load and preprocess image
         preprocessed_image, original_image = load_and_preprocess_image(
-            image_path, downsample_factor=downsample_factor
+            image_path, downsample_factor=1
         )
         
         # Generate liver and tumor segmentation masks with a single model call
         liver_mask, tumor_mask = get_combined_segmentation_masks(model, preprocessed_image)
+        
+        # Check if tumor was detected
+        has_tumor = np.any(tumor_mask > 0)
         
         # Create combined segmentation masks
         combined_mask_img, labeled_mask = create_combined_mask(
@@ -383,41 +410,54 @@ def analyze_and_save_medical_image(model, image_path, fast_mode=False):
         with open(os.path.join(output_dir, "medical_report.txt"), "w") as f:
             f.write(medical_explanation)
         
-        # Skip computationally expensive operations in fast mode
-        if not fast_mode:
-            # Compute SHAP values (expensive operation)
-            model_with_vector_output = modify_model_output(model)
-            background = np.zeros_like(preprocessed_image)
-            shap_values = compute_shap_values(model_with_vector_output, preprocessed_image, background)
-            
-            shap_map_liver = enhance_shap_visualization(shap_values, liver_mask)
+        # Compute SHAP values
+        model_with_vector_output = modify_model_output(model)
+        background = np.zeros_like(preprocessed_image)
+        shap_values = compute_shap_values(model_with_vector_output, preprocessed_image, background)
+        
+        # Process SHAP visualizations
+        shap_map_liver = enhance_shap_visualization(shap_values, liver_mask)
+        
+        if has_tumor:
+            # If tumor is detected, create and use tumor SHAP map
             shap_map_tumor = enhance_shap_visualization(shap_values, tumor_mask)
-            
-            liver_overlay = create_overlay(preprocessed_image, shap_map_liver, liver_mask, cv2.COLORMAP_SUMMER, intensity=7.0)
             tumor_overlay = create_overlay(preprocessed_image, shap_map_tumor, tumor_mask, cv2.COLORMAP_JET, intensity=2.0)
-            
+        else:
+            # If no tumor, create a placeholder tumor overlay (just black)
+            tumor_overlay = np.zeros_like(preprocessed_image[0])
+        
+        # Process liver overlay
+        liver_overlay = create_overlay(preprocessed_image, shap_map_liver, liver_mask, cv2.COLORMAP_SUMMER, intensity=7.0)
+        
+        # Create combined overlay
+        if has_tumor:
             combined_overlay = cv2.addWeighted(liver_overlay, 0.5, tumor_overlay, 0.5, 0)
-            
-            # Generate Grad-CAM++ explanations (expensive operation)
-            _, tumor_focused_grad_cam = compute_gradcam_plus_with_focus(
-                model, 
-                preprocessed_image, 
-                tumor_mask
-            )
-            
-            grad_cam_tumor_focused = overlay_heatmap_improved(
-                original_image, 
-                tumor_focused_grad_cam, 
-                alpha=0.7, 
-                use_jet=False
-            )
-            
-            # Resize and save additional visualizations
-            h, w = original_image.shape[:2]
-            combined_overlay_resized = cv2.resize(combined_overlay, (w, h), interpolation=cv2.INTER_LINEAR)
-            
-            cv2.imwrite(os.path.join(output_dir, "combined_shap_overlay.png"), combined_overlay_resized)
-            cv2.imwrite(os.path.join(output_dir, "gradcam_tumor_focused.png"), grad_cam_tumor_focused)
+        else:
+            # If no tumor, just use liver overlay for combined visualization
+            combined_overlay = liver_overlay
+        
+        # Generate Grad-CAM++ explanations - pass both masks and let the function decide
+        _, focused_grad_cam = compute_gradcam_plus_with_focus(
+            model, 
+            preprocessed_image, 
+            tumor_mask,
+            liver_mask
+        )
+        
+        # Create final visualization
+        grad_cam_focused = overlay_heatmap_improved(
+            original_image, 
+            focused_grad_cam, 
+            alpha=0.7, 
+            use_jet=False
+        )
+        
+        # Resize and save additional visualizations
+        h, w = original_image.shape[:2]
+        combined_overlay_resized = cv2.resize(combined_overlay, (w, h), interpolation=cv2.INTER_LINEAR)
+        
+        cv2.imwrite(os.path.join(output_dir, "combined_shap_overlay.png"), combined_overlay_resized)
+        cv2.imwrite(os.path.join(output_dir, "gradcam_tumor_focused.png"), grad_cam_focused)
         
         # Return results
         return output_dir, tumor_metrics, medical_explanation

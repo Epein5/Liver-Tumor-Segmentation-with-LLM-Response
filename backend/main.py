@@ -4,7 +4,7 @@ import shutil
 
 # Add the backend directory to sys.path
 # Comment if you want to build a docker image
-# sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
+# sys.path.append(os.path.abspath("/media/epein5/Data/TEST/backend"))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
@@ -30,7 +30,7 @@ app = FastAPI(title="Liver Cancer Segmentation API")
 
 # model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_model.h5")
 model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_55ephocsss.h5")
-# model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unetshap.h5")
+# # model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unetshap.h5")
 
 try:
     model = tf.keras.models.load_model(model_path)
@@ -42,6 +42,8 @@ except Exception as e:
         for file in files:
             if file.endswith(".h5"):
                 print(f"Found model file at: {os.path.join(root, file)}")
+
+# model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")
 
 
 # Serve static files (CSS, JS)
@@ -134,7 +136,7 @@ def generate_explanation(tumor_size, confidence):
 
 # API endpoint for image analysis
 @app.post("/analyze")
-async def analyze_image(file: UploadFile = File(...), fast_mode: bool = Form(False)):
+async def analyze_image(file: UploadFile = File(...)):
     try:
         # Save the uploaded file temporarily
         file_path = f"temp/{uuid.uuid4()}.png"
@@ -142,9 +144,9 @@ async def analyze_image(file: UploadFile = File(...), fast_mode: bool = Form(Fal
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Analyze the image with optimized performance option
+        # Analyze the image
         output_dir, tumor_metrics, medical_explanation = analyze_and_save_medical_image(
-            model, file_path, fast_mode=fast_mode
+            model, file_path
         )
 
         # Prepare response
@@ -153,15 +155,10 @@ async def analyze_image(file: UploadFile = File(...), fast_mode: bool = Form(Fal
             "tumor_metrics": tumor_metrics,
             "medical_explanation": medical_explanation,
             "original_image_url": f"/results/{os.path.basename(output_dir)}/original.png",
-            "segmented_image_url": f"/results/{os.path.basename(output_dir)}/combined_segmentation.png"
+            "segmented_image_url": f"/results/{os.path.basename(output_dir)}/combined_segmentation.png",
+            "gradcam_image_url": f"/results/{os.path.basename(output_dir)}/gradcam_tumor_focused.png",
+            "combined_shap_overlay_url": f"/results/{os.path.basename(output_dir)}/combined_shap_overlay.png",
         }
-        
-        # Only include these fields if not in fast mode
-        if not fast_mode:
-            response.update({
-                "gradcam_image_url": f"/results/{os.path.basename(output_dir)}/gradcam_tumor_focused.png",
-                "combined_shap_overlay_url": f"/results/{os.path.basename(output_dir)}/combined_shap_overlay.png",
-            })
 
         # Clean up temporary file
         os.remove(file_path)
