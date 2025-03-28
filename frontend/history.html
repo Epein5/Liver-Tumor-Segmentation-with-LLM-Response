@@ -130,7 +130,6 @@
                                     data-original="{{ item.original_image }}" 
                                     data-segmented="{{ item.segmented_image }}" 
                                     data-gradcam="{{ item.gradcam_image }}" 
-                                    data-combined-shap="{{ item.combined_shap_overlay }}" 
                                     style="background-color: #4CAF50; color: white; border: none; padding: 5px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold; transition: background-color 0.3s ease;">
                                 View Results
                             </button>
@@ -167,10 +166,6 @@
                     <div class="result-image">
                         <h4>Grad-CAM Image</h4>
                         <img id="history-gradcam-image" src="" alt="Grad-CAM visualization">
-                    </div>
-                    <div class="result-image">
-                        <h4>Combined SHAP Overlay</h4>
-                        <img id="history-combined-shap-overlay" src="" alt="Combined SHAP Overlay">
                     </div>
                 </div>
                 

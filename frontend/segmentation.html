@@ -174,11 +174,6 @@
                 
                 <div class="result-images">
                     <div class="result-image">
-                        <h4>SHAP (Liver and Tumor)</h4>
-                        <img id="combined-shap-overlay" src="" alt="Combined SHAP Overlay">
-                        <p><small>SHAP overlay</small></p>
-                    </div>
-                    <div class="result-image">
                         <h4>GRAD-CAM Tumor Focus</h4>
                         <!-- <p><small>Green: Liver tissue | Red: Potential tumor</small></p> -->
                         <img id="gradcam-image" src="" alt="Grad-CAM Tumor Focus">
@@ -223,7 +218,6 @@
             const resultsContainer = document.getElementById('results');
             const previewImage = document.getElementById('preview-image');
             const gradcamImage = document.getElementById('gradcam-image');
-            const combinedShapOverlay = document.getElementById('combined-shap-overlay');
 
             const originalImage = document.getElementById('original-image');
             const segmentedImage = document.getElementById('segmented-image');
@@ -260,8 +254,6 @@
                 segmentedImage.src = data.segmented_image_url;
                 gradcamImage.src = data.gradcam_image_url;
                 gradcamImage.style.display = 'block';
-                combinedShapOverlay.src = data.combined_shap_overlay_url;
-                combinedShapOverlay.style.display = 'block'; // Ensure SHAP image is displayed
 
                 // Format explanation text with line breaks
                 const formattedExplanation = data.medical_explanation

@@ -37,16 +37,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const originalImage = this.dataset.original;
             const segmentedImage = this.dataset.segmented;
             const gradcamImage = this.dataset.gradcam;
-            const combinedShapOverlay = this.dataset.combinedShap;
-
-            // Debug - Log the values to console to verify
-            console.log("SHAP image path:", combinedShapOverlay);
 
             // Update the detail section with the selected analysis data
             document.getElementById('history-original-image').src = originalImage;
             document.getElementById('history-segmented-image').src = segmentedImage;
             document.getElementById('history-gradcam-image').src = gradcamImage;
-            document.getElementById('history-combined-shap-overlay').src = combinedShapOverlay;
 
             // Show the detail section and hide the list
             document.getElementById('history-list').style.display = 'none';

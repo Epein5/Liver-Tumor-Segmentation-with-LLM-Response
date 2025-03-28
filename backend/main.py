@@ -93,7 +93,6 @@ async def history_page(request: Request):
                     "original_image": f"/results/{analysis_id}/original.png",
                     "segmented_image": f"/results/{analysis_id}/combined_segmentation.png",
                     "gradcam_image": f"/results/{analysis_id}/gradcam_tumor_focused.png",
-                    "combined_shap_overlay": f"/results/{analysis_id}/combined_shap_overlay.png",
                     "tumor_metrics": tumor_metrics,
                     "medical_explanation": medical_explanation,
                 })
@@ -157,7 +156,6 @@ async def analyze_image(file: UploadFile = File(...)):
             "original_image_url": f"/results/{os.path.basename(output_dir)}/original.png",
             "segmented_image_url": f"/results/{os.path.basename(output_dir)}/combined_segmentation.png",
             "gradcam_image_url": f"/results/{os.path.basename(output_dir)}/gradcam_tumor_focused.png",
-            "combined_shap_overlay_url": f"/results/{os.path.basename(output_dir)}/combined_shap_overlay.png",
         }
 
         # Clean up temporary file
@@ -196,7 +194,6 @@ async def read_history():
                 "timestamp": datetime.fromtimestamp(os.path.getctime(analysis_dir)).strftime("%Y-%m-%d %H:%M:%S"),
                 "original_image": f"/results/{analysis_id}/original.png",
                 "segmented_image": f"/results/{analysis_id}/combined_segmentation.png",
-                "combined_shap_overlay": f"/results/{analysis_id}/combined_shap_overlay.png",
                 "tumor_metrics": tumor_metrics,
                 "medical_explanation": medical_explanation,
             })

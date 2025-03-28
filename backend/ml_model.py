@@ -11,7 +11,6 @@ import uuid
 from scipy.ndimage import gaussian_filter
 import json
 import requests
-import shap
 
 
 def load_and_preprocess_image(image_path, target_size=(128, 128), downsample_factor=1):
@@ -330,41 +329,6 @@ def generate_medical_explanation(metrics):
     
     return explanation
 
-
-def compute_shap_values(model, image, background):
-    """Compute SHAP values using GradientExplainer."""
-    explainer = shap.GradientExplainer(model, background, local_smoothing=0.1)
-    return explainer.shap_values(image)
-
-def enhance_shap_visualization(shap_values, mask):
-    """Enhance SHAP values for better visualization."""
-    shap_map = np.abs(shap_values[0].squeeze())
-    shap_map = (shap_map - shap_map.min()) / (shap_map.max() - shap_map.min())
-    shap_map = scipy.ndimage.gaussian_filter(shap_map, sigma=2)  # Smoothing
-    shap_map = (shap_map * 255).astype(np.uint8)
-    
-    # Check if mask has any positive values
-    if np.any(mask > 0):
-        return cv2.bitwise_and(shap_map, shap_map, mask=mask)
-    else:
-        # If no mask, return just the shap_map
-        return shap_map
-
-def create_overlay(image, shap_map, mask, color_map, intensity=1.5):
-    """Create an overlay of SHAP values on the original image."""
-    image_rgb = (image[0] * 255).astype(np.uint8)
-    shap_colored = cv2.applyColorMap(shap_map, color_map)
-    overlay = image_rgb.copy()
-    
-    # Check if mask has any positive values
-    if np.any(mask > 0):
-        overlay[mask > 0] = cv2.addWeighted(shap_colored[mask > 0], intensity, image_rgb[mask > 0], 0.5, 0)
-    else:
-        # If no positive values in mask, just return the original image
-        pass
-        
-    return overlay
-
 def analyze_and_save_medical_image(model, image_path):
     """
     Main function to analyze a medical image, visualize results, and save to database.
@@ -410,32 +374,6 @@ def analyze_and_save_medical_image(model, image_path):
         with open(os.path.join(output_dir, "medical_report.txt"), "w") as f:
             f.write(medical_explanation)
         
-        # Compute SHAP values
-        model_with_vector_output = modify_model_output(model)
-        background = np.zeros_like(preprocessed_image)
-        shap_values = compute_shap_values(model_with_vector_output, preprocessed_image, background)
-        
-        # Process SHAP visualizations
-        shap_map_liver = enhance_shap_visualization(shap_values, liver_mask)
-        
-        if has_tumor:
-            # If tumor is detected, create and use tumor SHAP map
-            shap_map_tumor = enhance_shap_visualization(shap_values, tumor_mask)
-            tumor_overlay = create_overlay(preprocessed_image, shap_map_tumor, tumor_mask, cv2.COLORMAP_JET, intensity=2.0)
-        else:
-            # If no tumor, create a placeholder tumor overlay (just black)
-            tumor_overlay = np.zeros_like(preprocessed_image[0])
-        
-        # Process liver overlay
-        liver_overlay = create_overlay(preprocessed_image, shap_map_liver, liver_mask, cv2.COLORMAP_SUMMER, intensity=7.0)
-        
-        # Create combined overlay
-        if has_tumor:
-            combined_overlay = cv2.addWeighted(liver_overlay, 0.5, tumor_overlay, 0.5, 0)
-        else:
-            # If no tumor, just use liver overlay for combined visualization
-            combined_overlay = liver_overlay
-        
         # Generate Grad-CAM++ explanations - pass both masks and let the function decide
         _, focused_grad_cam = compute_gradcam_plus_with_focus(
             model, 
@@ -452,11 +390,7 @@ def analyze_and_save_medical_image(model, image_path):
             use_jet=False
         )
         
-        # Resize and save additional visualizations
-        h, w = original_image.shape[:2]
-        combined_overlay_resized = cv2.resize(combined_overlay, (w, h), interpolation=cv2.INTER_LINEAR)
-        
-        cv2.imwrite(os.path.join(output_dir, "combined_shap_overlay.png"), combined_overlay_resized)
+        # Save visualizations
         cv2.imwrite(os.path.join(output_dir, "gradcam_tumor_focused.png"), grad_cam_focused)
         
         # Return results
