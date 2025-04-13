@@ -1,0 +1,6 @@
+/* Add this to your existing CSS file if not already present */
+nav ul li a.active {
+    color: #2196F3;
+    font-weight: bold;
+    border-bottom: 2px solid #2196F3;
+}

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tumor Classification - Liver Cancer AI</title>
+    <link rel="stylesheet" href="static/css/style.css">
+    <style>
+        /* Additional styles for the classification form */
+        .classification-form {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        .submit-btn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        
+        .submit-btn:hover {
+            background-color: #0b7dda;
+        }
+        
+        .results-container {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: white;
+        }
+        
+        .results-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .diagnosis {
+            font-size: 1.2em;
+            font-weight: 500;
+            margin-bottom: 15px;
+        }
+        
+        .diagnosis-name {
+            color: #2196F3;
+            font-weight: bold;
+        }
+        
+        .clinical-summary, .recommended-actions, .probabilities {
+            margin-top: 20px;
+        }
+        
+        .clinical-summary h4, .recommended-actions h4, .probabilities h4 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .loading-indicator {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #2196F3;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>Liver Cancer AI</h1>
+        </div>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/segmentation">Tumor Segmentation</a></li>
+                <li><a href="/classification" class="active">Tumor Classification</a></li>
+                <li><a href="/research">Treatment & Research</a></li>
+                <li><a href="/history">History</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section class="intro-section">
+            <h2>Liver Disease Classification</h2>
+            <p>Enter patient clinical parameters to classify liver disease state. This tool uses a machine learning model trained on patient data to predict the liver condition category.</p>
+        </section>
+
+        <section class="classification-form">
+            <h3>Patient Parameters</h3>
+            <form id="classification-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="age">Age (years):</label>
+                        <input type="number" id="age" name="age" min="0" max="120" value="52" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="alb">Albumin (ALB) g/dL:</label>
+                        <input type="number" id="alb" name="alb" min="0" max="10" step="0.1" value="3.8" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="che">Cholinesterase (CHE):</label>
+                        <input type="number" id="che" name="che" min="0" step="0.1" value="6.2" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="chol">Cholesterol (CHOL):</label>
+                        <input type="number" id="chol" name="chol" min="0" value="190" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="prot">Total Protein (PROT):</label>
+                        <input type="number" id="prot" name="prot" min="0" max="150" value="70" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="alp">Alkaline Phosphatase (ALP) U/L:</label>
+                        <input type="number" id="alp" name="alp" min="0" value="280" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="alt">ALT U/L:</label>
+                        <input type="number" id="alt" name="alt" min="0" value="150" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ast">AST U/L:</label>
+                        <input type="number" id="ast" name="ast" min="0" value="120" required>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="bil">Bilirubin (BIL) mg/dL:</label>
+                        <input type="number" id="bil" name="bil" min="0" max="30" step="0.1" value="2.1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ggt">Gamma-GT (GGT) U/L:</label>
+                        <input type="number" id="ggt" name="ggt" min="0" value="210" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="submit-btn">Classify Disease</button>
+            </form>
+            
+            <div class="loading-indicator" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing patient data...</p>
+            </div>
+            
+            <div class="results-container" id="results" style="display: none;">
+                <div class="results-header">
+                    <h3>Patient Report</h3>
+                    <p id="patient-id"></p>
+                </div>
+                
+                <div class="diagnosis">
+                    <span>🔍 Diagnosis: </span>
+                    <span class="diagnosis-name" id="diagnosis-name"></span>
+                    <span> (Class </span>
+                    <span id="diagnosis-class"></span>
+                    <span>)</span>
+                </div>
+                
+                <div class="clinical-summary">
+                    <h4>📋 Clinical Summary:</h4>
+                    <p id="diagnosis-description"></p>
+                    <p><strong>Key Markers:</strong> <span id="key-markers"></span></p>
+                </div>
+                
+                <div class="recommended-actions">
+                    <h4>🚨 Recommended Actions:</h4>
+                    <ul id="recommended-actions-list"></ul>
+                </div>
+                
+                <div class="probabilities">
+                    <h4>⚕️ Full Probabilities:</h4>
+                    <ul id="probabilities-list"></ul>
+                </div>
+            </div>
+        </section>
+        
+        <section class="disclaimer">
+            <h3>Important Notice</h3>
+            <p>This tool is intended for educational and research purposes only. It is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of your physician or other qualified health provider with any questions you may have regarding a medical condition.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Liver Cancer AI. This site is for educational purposes only and not intended to provide medical advice.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('classification-form');
+            const loadingIndicator = document.getElementById('loading');
+            const resultsContainer = document.getElementById('results');
+            
+            form.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                // Show loading indicator
+                loadingIndicator.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                
+                // Get form data
+                const formData = {
+                    age: parseFloat(document.getElementById('age').value),
+                    alb: parseFloat(document.getElementById('alb').value),
+                    che: parseFloat(document.getElementById('che').value),
+                    chol: parseFloat(document.getElementById('chol').value),
+                    prot: parseFloat(document.getElementById('prot').value),
+                    alp: parseFloat(document.getElementById('alp').value),
+                    alt: parseFloat(document.getElementById('alt').value),
+                    ast: parseFloat(document.getElementById('ast').value),
+                    bil: parseFloat(document.getElementById('bil').value),
+                    ggt: parseFloat(document.getElementById('ggt').value)
+                };
+                
+                try {
+                    // Send data to server
+                    const response = await fetch('/classify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Classification failed');
+                    }
+                    
+                    const data = await response.json();
+                    
+                    // Fill in results
+                    document.getElementById('patient-id').textContent = data.patient_id;
+                    document.getElementById('diagnosis-name').textContent = data.diagnosis_name;
+                    document.getElementById('diagnosis-class').textContent = data.prediction;
+                    
+                    document.getElementById('diagnosis-description').textContent = data.description;
+                    document.getElementById('key-markers').textContent = data.markers;
+                    
+                    // Fill recommended actions list
+                    const actionsListElement = document.getElementById('recommended-actions-list');
+                    actionsListElement.innerHTML = '';
+                    
+                    data.actions.forEach(action => {
+                        const li = document.createElement('li');
+                        li.textContent = action;
+                        actionsListElement.appendChild(li);
+                    });
+                    
+                    // Fill probabilities list
+                    const probabilitiesListElement = document.getElementById('probabilities-list');
+                    probabilitiesListElement.innerHTML = '';
+                    
+                    Object.entries(data.probabilities).forEach(([className, prob]) => {
+                        const li = document.createElement('li');
+                        li.textContent = `${className}: ${prob.toFixed(1)}%`;
+                        probabilitiesListElement.appendChild(li);
+                    });
+                    
+                    // Hide loading indicator and show results
+                    loadingIndicator.style.display = 'none';
+                    resultsContainer.style.display = 'block';
+                    
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('An error occurred while classifying the data. Please try again.');
+                    loadingIndicator.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>

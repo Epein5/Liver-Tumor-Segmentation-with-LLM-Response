@@ -34,6 +34,64 @@ This project implements a deep learning solution for liver tumor segmentation us
 - Model explainability using SHAP values
 - LLM-based medical interpretations of results
 
+### Key Features in Detail
+
+#### 1. Medical Image Segmentation
+- EfficientNet-UNet deep learning architecture for segmentation
+- Pixel-level classification of liver and tumor regions
+- Color-coded visualizations (green for liver tissue, red for tumors)
+- Edge boundary detection to highlight segmented regions
+
+#### 2. Model Explainability
+- Grad-CAM++ visualization to highlight regions influencing predictions
+- SHAP values for model interpretability
+- Visual heatmaps showing areas of interest
+
+#### 3. AI-Generated Medical Reporting
+- Automatic generation of medical explanations and interpretations
+- Extraction of quantitative tumor metrics (size, percentage, dimensions)
+- Clinical recommendations based on analysis results
+
+#### 4. Image Upload and Processing
+- User-friendly upload interface for CT scan images
+- Automatic preprocessing and analysis pipeline
+- Real-time feedback with loading indicators
+
+#### 5. Classification Capabilities
+- Separate classification functionality in addition to segmentation
+- Structured request handling via dedicated endpoint
+
+#### 6. History Tracking and Management
+- Persistent storage of analysis results
+- Historical record viewing through dedicated interface
+- Ability to delete individual analyses or clear entire history
+
+#### 7. Educational Resources
+- Research information about liver cancer
+- Risk factors, symptoms, and treatment options
+- Dedicated pages for medical context
+
+## Core Technologies
+
+### Backend
+- FastAPI: Modern Python web framework powering the API endpoints
+- TensorFlow: Deep learning framework for the segmentation model
+- Uvicorn: ASGI server implementation
+- Python: Primary programming language
+- OpenCV (cv2): Image processing operations for mask creation and visualization
+- SciPy: Scientific computing for image manipulation
+- PIL/Pillow: Image loading and processing
+- NumPy/Pandas: Data handling and numerical operations
+
+### Frontend
+- HTML/CSS: Web interface structure and styling
+- JavaScript: Client-side interactivity
+- Jinja2 Templates: Server-side template rendering
+
+### Deployment & Infrastructure
+- Docker: Application containerization
+- Azure: Cloud deployment target
+- File-based storage: For persisting analysis results and images
 
 ## Installation
 
@@ -45,7 +103,6 @@ cd Liver-Tumor-Segmentation-with-LLM-Response
 ```
 
 The code is optimized to run on docker and be hosted in Azure:
-
 
 2. Build and run with Docker Compose:
 ```bash
@@ -62,7 +119,6 @@ To delete the deployment:
 ```bash
 ./delete-azure-deployment.sh
 ```
-
 
 ## Model Information
 The segmentation model is based on an EfficientNet-UNet architecture trained on liver CT scans. The model processes medical images at a 128x128 resolution and produces pixel-wise segmentation masks highlighting tumor regions.
@@ -86,7 +142,6 @@ The model was trained on a liver tumor segmentation dataset containing:
 - CT scans in NII format
 - Corresponding segmentation masks
 - Data was preprocessed and split into training/validation/test sets
-
 
 ## Research and Development
 The Jupyter notebooks in the Notebooks directory contain the research work, including:
@@ -136,11 +191,10 @@ The application can be run either directly on your host machine or using Docker.
    - Comment out the line: `sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))`
    - Uncomment the line: `model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")`
 
-2. Build and run the  the Docker image:
+2. Build and run the Docker image:
    ```
    docker-compose up -d --build .
    ```
-
 
 4. Access the application at http://localhost:8000
 
@@ -157,3 +211,12 @@ sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-wit
 ```
 
 Make sure to adjust these settings based on your chosen deployment method.
+
+## Application Flow
+1. User uploads a medical image through the web interface
+2. Backend processes the image through the TensorFlow model
+3. System generates segmentation masks for liver and tumor regions
+4. Visualizations are created (original, segmented, and Grad-CAM++ images)
+5. Tumor metrics are calculated and an AI-generated medical report is produced
+6. Results are saved to the database and displayed to the user
+7. Analysis can be accessed later through the history page

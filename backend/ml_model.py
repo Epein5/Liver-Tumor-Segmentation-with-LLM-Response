@@ -118,12 +118,18 @@ def create_combined_mask(original_img, liver_mask, tumor_mask):
 
 def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, liver_mask, layer_name="block7a_expand_activation"):
     """
-    Compute Grad-CAM++ heatmap with focus on the tumor region if present, otherwise focus on liver.
-    This version enhances the focus on tumor regions using the tumor mask, or liver if no tumor detected.
-    """
-    # Check if tumor mask has any positive values
-    has_tumor = np.any(tumor_mask > 0)
+    Compute Grad-CAM++ heatmap with a more nuanced focus on both tumor and liver regions.
     
+    Args:
+        model: Trained keras model
+        img_array: Input image array
+        tumor_mask: Binary mask for tumor region
+        liver_mask: Binary mask for liver region
+        layer_name: Name of the layer to compute Grad-CAM++ from
+    
+    Returns:
+        Tuple of (original_heatmap, focused_heatmap)
+    """
     # Create gradient model
     grad_model = tf.keras.models.Model(
         inputs=[model.input],
@@ -133,12 +139,14 @@ def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, liver_mask, la
     # Compute gradients
     with tf.GradientTape() as tape:
         conv_outputs, predictions = grad_model(img_array)
+        
+        # Weighted loss considering both tumor and liver probabilities
+        # If tumor is present, prioritize tumor, else focus on liver
+        has_tumor = np.any(tumor_mask > 0)
         if has_tumor:
-            # Use tumor probability when tumor is present
-            loss = predictions[:, 1]  # Focus on tumor probability
+            loss = predictions[:, 1] * 1.5  # More weight to tumor
         else:
-            # Use liver probability when no tumor is present
-            loss = predictions[:, 0]  # Focus on liver probability
+            loss = predictions[:, 0] * 1.0  # Liver probability
     
     # Get gradients and compute Grad-CAM++ weights
     grads = tape.gradient(loss, conv_outputs)
@@ -165,21 +173,20 @@ def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, liver_mask, la
     heatmap = gaussian_filter(heatmap, sigma=2)
     
     # Resize heatmap to match mask size
-    target_mask = tumor_mask if has_tumor else liver_mask
-    heatmap_resized = cv2.resize(heatmap, (target_mask.shape[1], target_mask.shape[0]))
+    heatmap_resized = cv2.resize(heatmap, (liver_mask.shape[1], liver_mask.shape[0]))
     
-    # Create two versions: one original and one with target focus
+    # Create two versions: original and focus-enhanced
     original_heatmap = heatmap_resized.copy()
     
-    # Target-focused heatmap: enhance values where target is present
-    focused_heatmap = heatmap_resized.copy()
+    # Create a combined focus mask
+    focus_mask = tumor_mask.copy().astype(float)
+    focus_mask += liver_mask.copy().astype(float) * 0.5  # Give liver less weight
+    focus_mask = np.clip(focus_mask, 0, 1)  # Ensure values are between 0 and 1
     
-    # Boost signal in target region
+    # Focused heatmap with combined mask
+    focused_heatmap = heatmap_resized.copy()
     boost_factor = 1.5
-    if has_tumor:
-        focused_heatmap = focused_heatmap * (1 + tumor_mask * boost_factor)
-    else:
-        focused_heatmap = focused_heatmap * (1 + liver_mask * boost_factor)
+    focused_heatmap = focused_heatmap * (1 + focus_mask * boost_factor)
     
     # Normalize again after boosting
     if np.max(focused_heatmap) != 0:
@@ -187,15 +194,19 @@ def compute_gradcam_plus_with_focus(model, img_array, tumor_mask, liver_mask, la
     
     return original_heatmap, focused_heatmap
 
-def overlay_heatmap_improved(img, heatmap, alpha=0.6, use_jet=True):
+
+def overlay_heatmap_improved(img, heatmap, liver_mask=None, tumor_mask=None, alpha=0.6, use_jet=True):
     """
     Overlay Grad-CAM heatmap on the original image with improved visibility.
+    Shows liver in blue, tumor in yellow, and background in red when masks are provided.
     
     Args:
         img: Original image (grayscale or RGB)
         heatmap: Heatmap data (normalized 0-1)
+        liver_mask: Binary mask of liver region (optional)
+        tumor_mask: Binary mask of tumor region (optional)
         alpha: Transparency factor
-        use_jet: Whether to use COLORMAP_JET (True) or a custom red-based colormap (False)
+        use_jet: Whether to use COLORMAP_JET when masks aren't provided
         
     Returns:
         Overlayed image
@@ -217,30 +228,39 @@ def overlay_heatmap_improved(img, heatmap, alpha=0.6, use_jet=True):
     # Convert heatmap to 0-255 scale
     heatmap_uint8 = np.uint8(255 * heatmap_resized)
     
-    # Apply colormap
-    if use_jet:
-        colored_heatmap = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
-    else:
-        # Custom red-focused colormap for tumor visualization
+    # If liver and tumor masks are provided, use blue-yellow-red scheme
+    if liver_mask is not None and tumor_mask is not None:
+        # Create colored heatmap with red background
         colored_heatmap = np.zeros_like(display_img)
-        colored_heatmap[:,:,0] = 0  # Blue channel
-        colored_heatmap[:,:,1] = 0  # Green channel
-        colored_heatmap[:,:,2] = heatmap_uint8  # Red channel
-    
-    # Create mask for areas with significant activation
-    sig_threshold = 0.3
-    sig_mask = (heatmap_resized > sig_threshold).astype(np.uint8)
-    
-    # Apply contour to significant areas for better boundary visualization
-    sig_mask_uint8 = np.uint8(sig_mask * 255)
-    contours, _ = cv2.findContours(sig_mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+        colored_heatmap[:,:] = [0, 0, 210]  # Set entire background to red (B,G,R)
+        
+        # Resize masks to match image dimensions
+        liver_mask_resized = cv2.resize(liver_mask, (display_img.shape[1], display_img.shape[0]), 
+                                        interpolation=cv2.INTER_NEAREST)
+        tumor_mask_resized = cv2.resize(tumor_mask, (display_img.shape[1], display_img.shape[0]), 
+                                        interpolation=cv2.INTER_NEAREST)
+        
+        # Blue for liver (B,G,R)
+        colored_heatmap[liver_mask_resized > 0] = [100, 0, 255]
+        
+        # Yellow for tumor - overrides liver where they overlap (B,G,R)
+        colored_heatmap[tumor_mask_resized > 0] = [0, 255, 255]
+        
+        # Weight the colored regions by heatmap intensity
+        for i in range(3):
+            colored_heatmap[:,:,i] = colored_heatmap[:,:,i] * heatmap_resized
+    else:
+        # Use original coloring scheme
+        if use_jet:
+            colored_heatmap = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
+        else:
+            colored_heatmap = np.zeros_like(display_img)
+            colored_heatmap[:,:,0] = 0  # Blue channel
+            colored_heatmap[:,:,1] = 0  # Green channel
+            colored_heatmap[:,:,2] = heatmap_uint8  # Red channel
+  
     # Apply alpha blending for the heatmap
     overlayed = cv2.addWeighted(display_img, 1 - alpha, colored_heatmap, alpha, 0)
-    
-    # Draw contours on areas of high activation (optional)
-    if contours:
-        cv2.drawContours(overlayed, contours, -1, (255, 255, 255), 1)
     
     return overlayed
 
@@ -321,6 +341,7 @@ def generate_medical_explanation(metrics):
         explanation += "The tumor dimensions could not be found. "
     
     explanation += (
+        f"The Grad-CAM++ heatmap indicates the following regions that contributed most to the model's prediction: irregular shapes, high contrast and texture variations"
         f"The scan shows a {severity} hepatic lesion with well-defined borders. "
         f"The Grad-CAM++ analysis confirms the area of concern and highlights regions of highest diagnostic significance. "
         f"Recommendations include clinical correlation, follow-up imaging in 3-6 months to assess for changes, "
@@ -386,7 +407,9 @@ def analyze_and_save_medical_image(model, image_path):
         grad_cam_focused = overlay_heatmap_improved(
             original_image, 
             focused_grad_cam, 
-            alpha=0.7, 
+            liver_mask=liver_mask,
+            tumor_mask=tumor_mask,
+            alpha=0.6, 
             use_jet=False
         )
         

@@ -4,14 +4,12 @@ import shutil
 
 # Add the backend directory to sys.path
 # Comment if you want to build a docker image
-# sys.path.append(os.path.abspath("/media/epein5/Data/TEST/backend"))
+sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-# import numpy as np
-# import cv2
 import base64
 import uuid
 from datetime import datetime
@@ -23,27 +21,17 @@ import scipy.ndimage
 import json
 from ml_model import analyze_and_save_medical_image
 from fastapi.middleware.cors import CORSMiddleware
+import numpy as np
+import pandas as pd
+
+# Import classification components
+from classification import ClassificationRequest, process_classification
 
 # Load the TensorFlow model
 
 app = FastAPI(title="Liver Cancer Segmentation API")
 
-# model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_model.h5")
-model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unet_55ephocsss.h5")
-# # model_path = os.path.join(os.path.dirname(__file__), "models", "efficientnet_unetshap.h5")
-
-try:
-    model = tf.keras.models.load_model(model_path)
-    print(f"Model loaded successfully from {model_path}")
-except Exception as e:
-    print(f"Error loading model: {str(e)}")
-    # Attempt to find the model by checking directory contents
-    for root, dirs, files in os.walk("."):
-        for file in files:
-            if file.endswith(".h5"):
-                print(f"Found model file at: {os.path.join(root, file)}")
-
-# model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")
+model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5", compile=False)
 
 
 # Serve static files (CSS, JS)
@@ -53,6 +41,7 @@ app.mount("/static", StaticFiles(directory="./frontend"), name="static")
 templates = Jinja2Templates(directory="./frontend")
 
 os.makedirs("db", exist_ok=True)
+os.makedirs("classificaltion", exist_ok=True)
 
 # Add CORS middleware
 app.add_middleware(
@@ -63,7 +52,6 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -71,6 +59,19 @@ async def home(request: Request):
 @app.get("/segmentation", response_class=HTMLResponse)
 async def segmentation_page(request: Request):
     return templates.TemplateResponse("segmentation.html", {"request": request})
+
+@app.get("/classification", response_class=HTMLResponse)
+async def classification_page(request: Request):
+    """Serve the classification page"""
+    return templates.TemplateResponse("classification.html", {"request": request})
+
+@app.post("/classify")
+async def classify_data(data: ClassificationRequest):
+    """Process classification request and return results"""
+    try:
+        return process_classification(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Classification error: {str(e)}")
 
 @app.get("/history", response_class=HTMLResponse)
 async def history_page(request: Request):

@@ -14,3 +14,4 @@ torch
 uvicorn
 scipy
 shap
+xgboost
