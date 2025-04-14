@@ -170,13 +170,14 @@ The application can be run either directly on your host machine or using Docker.
 
 1. Install the required dependencies:
    ```
-   pip install fastapi uvicorn tensorflow pillow scipy
+   pip install -r requirements.txt
    ```
 
 2. Modify the `main.py` file to use the local file system:
    - Uncomment the line: `sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))`
-   - UnComment out the line: `model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")`
+   - Uncomment out the line: `model = tf.keras.models.load_model("models/efficientnet_unet_55ephocsss.h5")`
    - Ensure the model path is correctly set for your environment
+   - The code is perfect for running Locally.(No modifications required)
 
 3. Run the application:
    ```
@@ -215,8 +216,8 @@ Make sure to adjust these settings based on your chosen deployment method.
 ## Application Flow
 1. User uploads a medical image through the web interface
 2. Backend processes the image through the TensorFlow model
-3. System generates segmentation masks for liver and tumor regions
+3. The system generates segmentation masks for liver and tumor regions
 4. Visualizations are created (original, segmented, and Grad-CAM++ images)
-5. Tumor metrics are calculated and an AI-generated medical report is produced
+5. Tumor metrics are calculated, and an AI-generated medical report is produced
 6. Results are saved to the database and displayed to the user
 7. Analysis can be accessed later through the history page
