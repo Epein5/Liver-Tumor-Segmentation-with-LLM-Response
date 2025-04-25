@@ -4,7 +4,8 @@ import shutil
 
 # Add the backend directory to sys.path
 # Comment if you want to build a docker image
-sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
+# sys.path.append(os.path.abspath("/media/epein5/Data/Liver-Tumor-Segmentation-with-LLM-Response/backend"))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, FileResponse

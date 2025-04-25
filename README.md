@@ -1,4 +1,43 @@
-# Liver Tumor Segmentation with LLM Response
+# Liver Disease Analysis Platform
+
+An advanced medical imaging and clinical data analysis platform for liver disease diagnosis, combining deep learning-based image segmentation and clinical parameter classification.
+
+## Features
+
+### Liver Tumor Segmentation
+- AI-powered identification and segmentation of liver tumors from medical images
+- Visual heatmaps using Grad-CAM++ for model explainability
+- Detailed tumor metrics calculation (size, area, dimensions)
+- Automatic medical report generation
+
+### Liver Disease Classification
+- Machine learning classification of liver diseases based on clinical parameters
+- Supports multiple disease categories including:
+  - Healthy Liver
+  - General Hepatitis
+  - Acute Hepatitis C
+  - Fibrosis
+  - Cirrhosis
+- Confidence scores and probability distribution across disease categories
+- Clinical recommendations based on disease classification
+
+## Setup Instructions
+
+1. Clone this repository:
+```bash
+git clone https://github.com/yourusername/Liver-Tumor-Segmentation-with-LLM-Response.git
+cd Liver-Tumor-Segmentation-with-LLM-Response
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Build and run with Docker Compose:
+```bash
+docker-compose up --build
+```
 
 ## Overview
 This project implements a deep learning solution for liver tumor segmentation using an EfficientNet-UNet architecture, enhanced with explainability through SHAP (SHapley Additive exPlanations) values and LLM-generated medical explanations. The system includes a web interface for uploading medical images, performing segmentation, and viewing results with detailed medical insights.

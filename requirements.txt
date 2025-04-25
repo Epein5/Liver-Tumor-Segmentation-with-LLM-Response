@@ -1,4 +1,3 @@
-
 fastapi
 keras==3.5.0
 matplotlib==3.10.1
